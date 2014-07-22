@@ -14,7 +14,6 @@ public class killerHeuristic implements ReversiAlgorithm
 	int myIndex;
 	int aiIndex;
 	int turn = 1;
-	boolean flag = true;
 
     public killerHeuristic() {} //the constructor
       
@@ -58,15 +57,11 @@ public class killerHeuristic implements ReversiAlgorithm
         }
       
         if (running) // Make a move if there is still time left.
-        {
             controller.doMove(selectedMove);
-        }
     }
      
     Move searchToDepth(int depth)
     {
-		//long start = System.nanoTime();
-
         Move parentMy;
 		Move parentAi;
 		Move childMy;
@@ -102,6 +97,7 @@ public class killerHeuristic implements ReversiAlgorithm
 				}
 			}
 			storeChild.clear();
+
 			for (int i = 0; i < storeParent.size(); i++) {
 				parent = storeParent.elementAt(i);
 				nextState = parent.getState();
@@ -119,5 +115,43 @@ public class killerHeuristic implements ReversiAlgorithm
 		}
         return optimalMove;
     }
+	
+	double evaluate(Node node, int player)
+    {
+        int score;
+        //checks which player's move it is
+        GameState state = node.getState();
+        Move move = node.getMove();
+        int x = move.getX();
+        int y = move.getY();
+		int minimize;
+        int maximize = state.getMarkCount(player);
+        if (player == 1)
+            minimize = state.getMarkCount(0);
+        else
+            minimize = state.getMarkCount(1);
+
+        int [][] scores = new int[][] {
+            {100, -20, 10,  5,  5, 10, -20, 100},
+            {-20, -50, -2, -2, -2, -2, -50, -20},
+            {10,   -2, -1, -1, -1, -1,  -2,  10},
+            {5,    -2, -1, -1, -1, -1,  -2,   5},
+            {5,    -2, -1, -1, -1, -1,  -2,   5},
+            {10,   -2, -1, -1, -1, -1,  -2,  10},
+            {-20, -50, -2, -2, -2, -2, -50, -20},
+            {100, -20, 10,  5,  5, 10, -20, 100}};
+
+        //positional player's endgame evaluation
+        //maximizes scores on each move
+        score = maximize-minimize;
+
+        if (player == 1)
+            score += scores[x][y];
+        else
+            //scores reduced if opponent gets the square
+            score -= scores[x][y];
+        
+        return score;
+    } 
 }
  
