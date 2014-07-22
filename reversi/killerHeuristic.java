@@ -1,6 +1,5 @@
 import reversi.*;
-import java.util.Vector;
-import java.util.Iterator;
+import java.util.*;
 
 public class killerHeuristic implements ReversiAlgorithm
 {
@@ -11,9 +10,11 @@ public class killerHeuristic implements ReversiAlgorithm
     volatile boolean running; // Note: volatile for synchronization issues.
     GameController controller;
     GameState initialState;
-    int myIndex;
+    Move selectedMove;		
+	int myIndex;
 	int aiIndex;
-    Move selectedMove;
+	int turn = 1;
+	boolean flag = true;
 
     public killerHeuristic() {} //the constructor
       
@@ -27,6 +28,7 @@ public class killerHeuristic implements ReversiAlgorithm
     {
         initialState = state;
         myIndex = playerIndex;
+		aiIndex = myIndex;
         controller = game;
         initialized = true;
 	}
@@ -49,8 +51,10 @@ public class killerHeuristic implements ReversiAlgorithm
 			Move newMove = searchToDepth(currentDepth++);
   
             // Check that there's a new move available.
-            if (newMove != null)
+            if (newMove != null) {
                 selectedMove = newMove;
+				break;
+			}
         }
       
         if (running) // Make a move if there is still time left.
@@ -60,55 +64,59 @@ public class killerHeuristic implements ReversiAlgorithm
     }
      
     Move searchToDepth(int depth)
-    {	
-		if (myIndex == 1)
-			aiIndex = 0;
-		else
-			aiIndex = 1;
+    {
+		//long start = System.nanoTime();
 
-        Move parentMove;
-		Move childMove;
-        Vector parentMoves = initialState.getPossibleMoves(myIndex);
-		Vector childMoves;
-		
+        Move parentMy;
+		Move parentAi;
+		Move childMy;
+		Move childAi;
 		Move optimalMove = null;
+        
+		Vector parentMoves;
+		Vector childMoves;
+		Vector<Node> storeParent = new Vector<Node>();
+		Vector<Node> storeChild = new Vector<Node>();
+
 		GameState nextState;
 		GameState finalState;
-		Node lapsi;
-		Node juuri;
-		int disc;
-		int maxChild = 0;
-		int maxAi = 0;
 		
-		for (int i = 0; i < parentMoves.size(); i++) {
-			parentMove = (Move)parentMoves.elementAt(i);
-			nextState = initialState.getNewInstance(parentMove);
+		Node child;
+		Node parent;
+		Node first = new Node(initialState, null);
+		
+		storeChild.addElement(first);
+		
+		for (int z = 0; z < DEPTH_LIMIT; z++) {
+			for (int i = 0; i < storeChild.size(); i++) {
+				parent = storeChild.elementAt(i);
+				initialState = parent.getState();
+				parentMoves = initialState.getPossibleMoves(myIndex);
 			
-			juuri = new Node(nextState, parentMove);
-			childMoves = nextState.getPossibleMoves(aiIndex);
-
-			for (int j = 0; j < childMoves.size(); j++) {
-				childMove = (Move)childMoves.elementAt(j);
-				finalState = nextState.getNewInstance(childMove);
-				
-				disc = finalState.getMarkCount(aiIndex);
-				lapsi = new Node(finalState, childMove);
-				lapsi.setScore(disc);
-				juuri.addChild(lapsi);
-				
-				if (disc > maxChild)
-					maxChild = disc;
+				for (int j = 0; j < storeChild.size(); j++) {
+					parentMy = (Move)parentMoves.elementAt(j);
+					nextState = initialState.getNewInstance(parentMy);
+					parent = new Node(nextState, parentMy);
+					
+					storeParent.addElement(parent);
+				}
 			}
-			
-			if (maxAi == 0)
-				maxChild = maxAi;
-			if (maxChild <= maxAi)
-				optimalMove = (Move)parentMoves.elementAt(i);
-
+			storeChild.clear();
+			for (int i = 0; i < storeParent.size(); i++) {
+				parent = storeParent.elementAt(i);
+				nextState = parent.getState();
+				childMoves = nextState.getPossibleMoves(aiIndex);
+				
+				for (int j = 0; j < childMoves.size(); j++){
+					childAi = (Move)childMoves.elementAt(j);
+					finalState = nextState.getNewInstance(childAi);
+					child = new Node(finalState, childAi);
+					parent.addChild(child);
+					storeChild.addElement(child);
+				}
+			}
+			storeParent.clear();
 		}
-		/*Vector kidit = juuri.getChildren();
-		Iterator e = kidit.iterator();*/
-
         return optimalMove;
     }
 }
