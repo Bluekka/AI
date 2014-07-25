@@ -3,155 +3,134 @@ import java.util.*;
 
 public class killerHeuristic implements ReversiAlgorithm
 {
-    // Constants
-    private final static int DEPTH_LIMIT = 2; // Just an example value.
-    // Variables
-    boolean initialized;
-    volatile boolean running; // Note: volatile for synchronization issues.
-    GameController controller;
-    GameState initialState;
-    Move selectedMove;		
+	// Constants
+	public final static int DEPTH_LIMIT = 1; // Just an example value.
+	// Variables
+	boolean initialized;
+	volatile boolean running; // Note: volatile for synchronization issues.
+	GameController controller;
+	GameState initialState;
+	public Move selectedMove;
 	int myIndex;
 	int aiIndex;
-	int turn = 1;
 
-    public killerHeuristic() {} //the constructor
-      
-    public void requestMove(GameController requester)
-    {
-        running = false;
-        requester.doMove(selectedMove);
-    }
+	public killerHeuristic() {} //the constructor
 
-    public void init(GameController game, GameState state, int playerIndex, int turnLength)
-    {
-        initialState = state;
-        myIndex = playerIndex;
-		aiIndex = myIndex;
-        controller = game;
-        initialized = true;
+	public void requestMove(GameController requester)
+	{
+		running = false;
+		requester.doMove(selectedMove);
 	}
 
-    public String getName() { return "killerHeuristic"; }
+	public void init(GameController game, GameState state, int playerIndex, int turnLength)
+	{
+		initialState = state;
+		myIndex = playerIndex;
+		if (myIndex == 1)
+			aiIndex = 0;
+		else
+			aiIndex = 1;
+		controller = game;
+		initialized = true;
+	}
 
-    public void cleanup() {}
-    public void run()
-    {
-        //implementation of the actual algorithm
-        while(!initialized);
-        initialized = false;
-        running = true;
-        selectedMove = null;
+	public String getName() { return "killerHeuristic"; }
 
-        int currentDepth = 1;
+	public void cleanup() {}
+	public void run()
+	{
+		//implementation of the actual algorithm
+		while(!initialized);
+		initialized = false;
+		running = true;
+		selectedMove = null;
+		searchToDepth();
+	}
 
-        while (running && currentDepth < DEPTH_LIMIT)
-        {
-			Move newMove = searchToDepth(currentDepth++);
-  
-            // Check that there's a new move available.
-            if (newMove != null) {
-                selectedMove = newMove;
-				break;
-			}
-        }
-      
-        if (running) // Make a move if there is still time left.
-            controller.doMove(selectedMove);
-    }
-     
-    Move searchToDepth(int depth)
-    {
-        Move parentMy;
-		Move parentAi;
-		Move childMy;
-		Move childAi;
-		Move optimalMove = null;
-        
+	void searchToDepth()
+	{
+		Move parentMove;
+		Move childMove;
+
 		Vector parentMoves;
 		Vector childMoves;
 		Vector<Node> storeParent = new Vector<Node>();
 		Vector<Node> storeChild = new Vector<Node>();
+		Vector<Node> storeRoot = new Vector<Node>();
 
 		GameState nextState;
 		GameState finalState;
-		
+
 		Node child;
-		Node parent;
-		Node first = new Node(initialState, null);
-		
-		storeChild.addElement(first);
-		
-		for (int z = 0; z < DEPTH_LIMIT; z++) {
-			for (int i = 0; i < storeChild.size(); i++) {
-				parent = storeChild.elementAt(i);
-				initialState = parent.getState();
-				parentMoves = initialState.getPossibleMoves(myIndex);
-			
-				for (int j = 0; j < storeChild.size(); j++) {
-					parentMy = (Move)parentMoves.elementAt(j);
-					nextState = initialState.getNewInstance(parentMy);
-					parent = new Node(nextState, parentMy);
-					
+		Node parent = new Node(initialState, null);
+		Node best = null;
+		Node maxChild = new Node();
+
+		//boolean selected = false;
+		double minParent = 50;
+		double maxScore;
+		//int minChilds;
+		int childScore;
+		int depth = 1;
+
+		storeChild.addElement(parent);
+
+		do {
+			for (Node parentMy : storeChild) {
+				nextState = parentMy.getState();
+				parentMoves = nextState.getPossibleMoves(myIndex);
+
+				for (int j = 0; j < parentMoves.size(); j++) {
+					parentMove = (Move)parentMoves.elementAt(j);
+					parent = new Node(nextState.getNewInstance(parentMove), parentMove);
+					parentMy.addChild(parent);
 					storeParent.addElement(parent);
+
+					if (depth == 1)
+						storeRoot.addElement(parent);
 				}
 			}
 			storeChild.clear();
+			//minChilds = 1;
 
-			for (int i = 0; i < storeParent.size(); i++) {
-				parent = storeParent.elementAt(i);
-				nextState = parent.getState();
+			for (Node parentAi : storeParent) {
+				maxChild.setScore(0);
+				maxScore = 0;
+
+				nextState = parentAi.getState();
 				childMoves = nextState.getPossibleMoves(aiIndex);
-				
+
 				for (int j = 0; j < childMoves.size(); j++){
-					childAi = (Move)childMoves.elementAt(j);
-					finalState = nextState.getNewInstance(childAi);
-					child = new Node(finalState, childAi);
-					parent.addChild(child);
+					childMove = (Move)childMoves.elementAt(j);
+					finalState = nextState.getNewInstance(childMove);
+					child = new Node(finalState, childMove);
+					childScore = finalState.getMarkCount(aiIndex);
+
+					child.setScore(childScore);
+					parentAi.addChild(child);
 					storeChild.addElement(child);
+
+					if (childScore > maxScore) {
+						maxChild = child;
+						maxScore = childScore;
+					}
 				}
+				if (maxScore < minParent) {
+					//minChilds = 1;
+					best = maxChild;
+					minParent = maxScore;
+				}
+				//else if (maxScore == minParent)
+				//	minChilds++;
 			}
 			storeParent.clear();
-		}
-        return optimalMove;
-    }
-	
-	double evaluate(Node node, int player)
-    {
-        int score;
-        //checks which player's move it is
-        GameState state = node.getState();
-        Move move = node.getMove();
-        int x = move.getX();
-        int y = move.getY();
-		int minimize;
-        int maximize = state.getMarkCount(player);
-        if (player == 1)
-            minimize = state.getMarkCount(0);
-        else
-            minimize = state.getMarkCount(1);
-
-        int [][] scores = new int[][] {
-            {100, -20, 10,  5,  5, 10, -20, 100},
-            {-20, -50, -2, -2, -2, -2, -50, -20},
-            {10,   -2, -1, -1, -1, -1,  -2,  10},
-            {5,    -2, -1, -1, -1, -1,  -2,   5},
-            {5,    -2, -1, -1, -1, -1,  -2,   5},
-            {10,   -2, -1, -1, -1, -1,  -2,  10},
-            {-20, -50, -2, -2, -2, -2, -50, -20},
-            {100, -20, 10,  5,  5, 10, -20, 100}};
-
-        //positional player's endgame evaluation
-        //maximizes scores on each move
-        score = maximize-minimize;
-
-        if (player == 1)
-            score += scores[x][y];
-        else
-            //scores reduced if opponent gets the square
-            score -= scores[x][y];
-        
-        return score;
-    } 
+			
+			for (Node root : storeRoot) {
+				if (best.isParent(root)) {
+					selectedMove = root.getMove();
+					break;
+				}
+			}
+		} while (depth++ < DEPTH_LIMIT); //&& !selected);
+	}
 }
- 
